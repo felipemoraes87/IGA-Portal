@@ -1,0 +1,50 @@
+{
+  "name": "iga-portal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint",
+    "quality:sonar": "npx -y @sonar/scan",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed",
+    "orchestrator:preflight": "powershell -ExecutionPolicy Bypass -File scripts/validate-legacy-schema.ps1",
+    "orchestrator:sync:direct": "powershell -ExecutionPolicy Bypass -File scripts/sync-orchestrator-direct.ps1"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@prisma/client": "^6.17.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.543.0",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "prisma": "^6.17.1",
+    "tailwindcss": "^4",
+    "tsx": "^4.20.5",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "minimatch": "^10.2.1"
+  }
+}

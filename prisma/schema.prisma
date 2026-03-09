@@ -1,0 +1,639 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  MANAGER
+  ADMIN
+}
+
+enum Criticality {
+  LOW
+  MED
+  HIGH
+}
+
+enum AssignmentSource {
+  DIRECT
+  BR
+}
+
+enum AccessRequestStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+enum ExecutionStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum ApprovalDelegationScope {
+  ANY
+  MANAGER
+  SYSTEM_OWNER
+  SR_OWNER
+}
+
+enum ScimEnvironment {
+  production
+  staging
+  sandbox
+}
+
+enum ScimAuthType {
+  bearer_token
+  oauth2
+  api_key
+}
+
+enum ScimUpdateMethod {
+  PATCH
+  PUT
+}
+
+enum ScimProvisioningMode {
+  real_time
+  batch
+}
+
+enum ScimGroupSourceOfTruth {
+  scim
+  local
+  hybrid
+}
+
+enum ScimSyncStrategy {
+  full
+  incremental
+}
+
+enum ScimRetryBackoff {
+  fixed
+  exponential
+}
+
+enum LogExportDestination {
+  SPLUNK_HEC
+  AWS_S3
+}
+
+model User {
+  id                  String                     @id @default(cuid())
+  externalId          String?                    @unique
+  email               String                     @unique
+  name                String
+  role                UserRole                   @default(USER)
+  roleAssignments     UserRoleAssignment[]
+  managerId           String?
+  manager             User?                      @relation("UserManager", fields: [managerId], references: [id])
+  reports             User[]                     @relation("UserManager")
+  active              Boolean                    @default(true)
+  sessions            Session[]
+  businessRoles       UserBusinessRole[]
+  permissionSnapshot  UserPermissionAssignment[]
+  requestedAccess     AccessRequest[]            @relation("Requester")
+  targetedAccess      AccessRequest[]            @relation("TargetUser")
+  approvals           AccessApproval[]
+  approvedRequests    AccessRequest[]            @relation("Approver")
+  auditLogs           AuditLog[]
+  scimGroups          UserScimGroup[]
+  provisionings       UserProvisioningEvent[]
+  ownedSystems        System[]                   @relation("SystemOwner")
+  ownedPermissions    Permission[]               @relation("PermissionOwner")
+  outgoingDelegations ApprovalDelegation[]       @relation("Delegator")
+  incomingDelegations ApprovalDelegation[]       @relation("Delegate")
+  createdDelegations  ApprovalDelegation[]       @relation("DelegationCreatedBy")
+  updatedDelegations  ApprovalDelegation[]       @relation("DelegationUpdatedBy")
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+}
+
+model UserRoleAssignment {
+  userId    String   @map("user_id")
+  role      UserRole
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+  @@index([role])
+  @@map("user_role_assignments")
+}
+
+model UserScimGroup {
+  id        String   @id @default(cuid())
+  userId    String
+  value     String
+  display   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, value])
+}
+
+model UserProvisioningEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  operation  String
+  source     String   @default("SCIM")
+  requestId  String?
+  rawPayload Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model System {
+  id          String               @id @default(cuid())
+  name        String               @unique
+  criticality Criticality          @default(MED)
+  ownerId     String?
+  owner       User?                @relation("SystemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  permissions Permission[]
+  delegations ApprovalDelegation[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([ownerId])
+}
+
+model Permission {
+  id                String                     @id @default(cuid())
+  systemId          String
+  system            System                     @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  ownerId           String?
+  owner             User?                      @relation("PermissionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  name              String
+  description       String?
+  businessRoleLinks BusinessRolePermission[]
+  assignments       UserPermissionAssignment[]
+  requests          AccessRequest[]
+  delegations       ApprovalDelegation[]
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@unique([systemId, name])
+  @@index([ownerId])
+}
+
+model BusinessRole {
+  id          String                   @id @default(cuid())
+  name        String                   @unique
+  description String?
+  permissions BusinessRolePermission[]
+  users       UserBusinessRole[]
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+}
+
+model BusinessRolePermission {
+  id             String       @id @default(cuid())
+  businessRoleId String
+  permissionId   String
+  businessRole   BusinessRole @relation(fields: [businessRoleId], references: [id], onDelete: Cascade)
+  permission     Permission   @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([businessRoleId, permissionId])
+}
+
+model UserBusinessRole {
+  id             String       @id @default(cuid())
+  userId         String
+  businessRoleId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessRole   BusinessRole @relation(fields: [businessRoleId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, businessRoleId])
+}
+
+model UserPermissionAssignment {
+  id           String           @id @default(cuid())
+  userId       String
+  permissionId String
+  source       AssignmentSource
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission       @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+}
+
+model AccessRequest {
+  id             String              @id @default(cuid())
+  requesterId    String
+  targetUserId   String
+  permissionId   String
+  justification  String
+  status         AccessRequestStatus @default(PENDING_APPROVAL)
+  approverId     String?
+  idempotencyKey String              @unique
+  requester      User                @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  targetUser     User                @relation("TargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  permission     Permission          @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+  approver       User?               @relation("Approver", fields: [approverId], references: [id], onDelete: SetNull)
+  approvals      AccessApproval[]
+  execution      AccessExecution?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+}
+
+model AccessApproval {
+  id         String           @id @default(cuid())
+  requestId  String
+  approverId String
+  decision   ApprovalDecision
+  comment    String?
+  decidedAt  DateTime         @default(now())
+  request    AccessRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  approver   User             @relation(fields: [approverId], references: [id], onDelete: Cascade)
+}
+
+model AccessExecution {
+  id             String          @id @default(cuid())
+  requestId      String          @unique
+  status         ExecutionStatus @default(RUNNING)
+  idempotencyKey String          @unique
+  n8nExecutionId String?
+  startedAt      DateTime        @default(now())
+  finishedAt     DateTime?
+  errorMessage   String?
+  request        AccessRequest   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalDelegation {
+  id           String                  @id @default(cuid())
+  delegatorId  String
+  delegateId   String
+  scope        ApprovalDelegationScope @default(ANY)
+  systemId     String?
+  permissionId String?
+  startsAt     DateTime
+  endsAt       DateTime
+  reason       String?
+  active       Boolean                 @default(true)
+  createdById  String?
+  updatedById  String?
+  delegator    User                    @relation("Delegator", fields: [delegatorId], references: [id], onDelete: Cascade)
+  delegate     User                    @relation("Delegate", fields: [delegateId], references: [id], onDelete: Cascade)
+  system       System?                 @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  permission   Permission?             @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdBy    User?                   @relation("DelegationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?                   @relation("DelegationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@index([delegatorId, active, startsAt, endsAt])
+  @@index([delegateId, active, startsAt, endsAt])
+  @@index([scope, systemId, permissionId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  details    Json?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+}
+
+model ScimSettings {
+  id                          String                 @id @default(cuid())
+  tenantKey                   String                 @default("default")
+  environment                 ScimEnvironment
+  scimBaseUrl                 String
+  connectionStatus            String                 @default("unknown")
+  authType                    ScimAuthType           @default(bearer_token)
+  bearerTokenEnc              String?
+  oauthTokenUrl               String?
+  oauthClientId               String?
+  oauthClientSecretEnc        String?
+  oauthScopes                 Json?
+  apiKeyEnc                   String?
+  apiKeyHeader                String?
+  tokenExpiration             Int?
+  autoRotateToken             Boolean                @default(false)
+  enableCreateUser            Boolean                @default(true)
+  enableUpdateUser            Boolean                @default(true)
+  updateMethod                ScimUpdateMethod       @default(PATCH)
+  enableDeactivateUser        Boolean                @default(true)
+  enableDeleteUser            Boolean                @default(false)
+  provisioningMode            ScimProvisioningMode   @default(real_time)
+  attributeMappings           Json?
+  enableGroupSync             Boolean                @default(false)
+  groupSourceOfTruth          ScimGroupSourceOfTruth @default(scim)
+  groupMappings               Json?
+  syncGroupMembership         Boolean                @default(true)
+  syncStrategy                ScimSyncStrategy       @default(incremental)
+  syncIntervalMinutes         Int                    @default(60)
+  retryEnabled                Boolean                @default(true)
+  maxRetries                  Int                    @default(3)
+  retryBackoff                ScimRetryBackoff       @default(exponential)
+  ipAllowlist                 Json?
+  rateLimitPerMinute          Int?
+  mtlsEnabled                 Boolean                @default(false)
+  auditEnabled                Boolean                @default(true)
+  retentionDays               Int                    @default(90)
+  lastTestAt                  DateTime?
+  lastTestStatus              String?
+  lastTestMessage             String?
+  lastSchemaValidationAt      DateTime?
+  lastSchemaValidationStatus  String?
+  lastSchemaValidationMessage String?
+  createdAt                   DateTime               @default(now())
+  updatedAt                   DateTime               @updatedAt
+
+  @@unique([tenantKey, environment])
+}
+
+model LogExportSettings {
+  id                    String               @id @default(cuid())
+  tenantKey             String               @default("default") @unique
+  destination           LogExportDestination @default(SPLUNK_HEC)
+  enabled               Boolean              @default(false)
+  splunkEndpoint        String?
+  splunkTokenEnc        String?
+  splunkIndex           String?
+  splunkSource          String?
+  splunkSourceType      String?
+  s3Region              String?
+  s3Bucket              String?
+  s3Prefix              String?
+  s3AccessKeyIdEnc      String?
+  s3SecretAccessKeyEnc  String?
+  s3SessionTokenEnc     String?
+  lastExportAt          DateTime?
+  lastExportStatus      String?
+  lastExportMessage     String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+}
+
+model OrchestratorAssignment {
+  rowId            Int     @id @default(autoincrement()) @map("_row_id")
+  id               String?
+  action           String?
+  createdAt        String? @map("created_at")
+  sourceProcess    String? @map("source_process")
+  userId           String? @map("user_id")
+  userName         String? @map("user_name")
+  requesterId      String? @map("requester_id")
+  requestMode      String? @map("request_mode")
+  justification    String?
+  grantType        String? @map("grant_type")
+  grantOrigin      String? @map("grant_origin")
+  businessRole     String? @map("business_role")
+  system           String?
+  systemId         String? @map("system_id")
+  systemRole       String? @map("system_role")
+  status           String?
+  grantDate        String? @map("grant_date")
+  revocationDate   String? @map("revocation_date")
+  expirationDate   String? @map("expiration_date")
+  executor         String?
+  approver         String?
+  ticket           String?
+  executionId      String? @map("execution_id")
+  logDetails       String? @map("log_details")
+  businessRoleName String? @map("business_role_name")
+
+  @@index([id])
+  @@index([userId])
+  @@index([systemId])
+  @@index([systemRole])
+  @@index([businessRole])
+  @@map("assignment")
+}
+
+model OrchestratorBusinessRole {
+  rowId               Int     @id @default(autoincrement()) @map("_row_id")
+  id                  String?
+  associationCriteria String? @map("association_criteria")
+  company             String?
+  createdAt           String? @map("created_at")
+  hashString          String? @map("hash_string")
+  isCurrent           String? @map("is_current")
+  lastRevisionDate    String? @map("last_revision_date")
+  name                String?
+  nextRevisionDate    String? @map("next_revision_date")
+  owner               String?
+  ownerId             String? @map("owner_id")
+  status              String?
+  technicalId         String? @map("technical_id")
+  updatedAt           String? @map("updated_at")
+
+  @@index([id])
+  @@index([technicalId])
+  @@index([ownerId])
+  @@map("business_roles")
+}
+
+model OrchestratorOrganizational {
+  rowId      Int     @id @default(autoincrement()) @map("_row_id")
+  id         String?
+  createdAt  String? @map("created_at")
+  hashString String? @map("hash_string")
+  isCurrent  String? @map("is_current")
+  name       String?
+  owner      String?
+  ownerId    String? @map("owner_id")
+  parent     String?
+  parentId   String? @map("parent_id")
+  status     String?
+  type       String?
+  updatedAt  String? @map("updated_at")
+  vp         String?
+  vpId       String? @map("vp_id")
+
+  @@index([id])
+  @@index([ownerId])
+  @@index([parentId])
+  @@map("organizational")
+}
+
+model OrchestratorOrganizationalBusinessRole {
+  rowId            Int     @id @default(autoincrement()) @map("_row_id")
+  id               String?
+  businessRoleId   String? @map("business_role_id")
+  createdAt        String? @map("created_at")
+  isCurrent        String? @map("is_current")
+  organizationalId String? @map("organizational_id")
+  updatedAt        String? @map("updated_at")
+
+  @@index([id])
+  @@index([businessRoleId])
+  @@index([organizationalId])
+  @@map("organizational_business_roles")
+}
+
+model OrchestratorSnapshotBrUsersMatch {
+  rowId              Int     @id @default(autoincrement()) @map("_row_id")
+  brId               String? @map("br_id")
+  brName             String? @map("br_name")
+  brPedeArea         String? @map("br_pede_area")
+  brPedeCargo        String? @map("br_pede_cargo")
+  brPedeCc           String? @map("br_pede_cc")
+  brPedeContrato     String? @map("br_pede_contrato")
+  brPedeEmpresa      String? @map("br_pede_empresa")
+  brPedeSenioridade  String? @map("br_pede_senioridade")
+  brPedeVp           String? @map("br_pede_vp")
+  dataSnapshot       String? @map("data_snapshot")
+  email              String?
+  userHierarquiaComp String? @map("user_hierarquia_completa")
+  userId             String? @map("user_id")
+  userName           String? @map("user_name")
+  userTemArea        String? @map("user_tem_area")
+  userTemCargo       String? @map("user_tem_cargo")
+  userTemCc          String? @map("user_tem_cc")
+  userTemContrato    String? @map("user_tem_contrato")
+  userTemEmpresa     String? @map("user_tem_empresa")
+  userTemSenioridade String? @map("user_tem_senioridade")
+  userTemVp          String? @map("user_tem_vp")
+
+  @@index([brId])
+  @@index([userId])
+  @@map("snapshot_br_users_match")
+}
+
+model OrchestratorSnapshotUserEntitlementsDetailed {
+  rowId         Int     @id @default(autoincrement()) @map("_row_id")
+  dataSnapshot  String? @map("data_snapshot")
+  email         String?
+  itemId        String? @map("item_id")
+  itemName      String? @map("item_name")
+  itemOrigin    String? @map("item_origin")
+  itemTechnical String? @map("item_technical_id")
+  pacoteId      String? @map("pacote_id")
+  pacoteName    String? @map("pacote_name")
+  userArea      String? @map("user_area")
+  userCargo     String? @map("user_cargo")
+  userId        String? @map("user_id")
+  userName      String? @map("user_name")
+
+  @@index([userId])
+  @@index([itemId])
+  @@index([pacoteId])
+  @@map("snapshot_user_entitlements_detailed")
+}
+
+model OrchestratorSoftware {
+  rowId              Int     @id @default(autoincrement()) @map("_row_id")
+  id                 String?
+  approversGroup     String? @map("approvers_group")
+  createdAt          String? @map("created_at")
+  criticalSystem     String? @map("critical_system")
+  hashString         String? @map("hash_string")
+  isCurrent          String? @map("is_current")
+  name               String?
+  orgOwnerId         String? @map("org_owner_id")
+  pricing            String?
+  provider           String?
+  safetyAssessment   String? @map("safety_assessment")
+  status             String?
+  technicalManagerId String? @map("technical_manager_id")
+  updatedAt          String? @map("updated_at")
+
+  @@index([id])
+  @@index([orgOwnerId])
+  @@map("softwares")
+}
+
+model OrchestratorSystemBusinessRole {
+  rowId          Int     @id @default(autoincrement()) @map("_row_id")
+  id             String?
+  businessRoleId String? @map("business_role_id")
+  createdAt      String? @map("created_at")
+  isCurrent      String? @map("is_current")
+  systemRoleId   String? @map("system_role_id")
+  updatedAt      String? @map("updated_at")
+
+  @@index([id])
+  @@index([businessRoleId])
+  @@index([systemRoleId])
+  @@map("system_business_roles")
+}
+
+model OrchestratorSystemRole {
+  rowId              Int     @id @default(autoincrement()) @map("_row_id")
+  id                 String?
+  createdAt          String? @map("created_at")
+  description        String?
+  hashString         String? @map("hash_string")
+  isCurrent          String? @map("is_current")
+  name               String?
+  owner              String?
+  ownerId            String? @map("owner_id")
+  origin             String?
+  risk               String?
+  softwareId         String? @map("software_id")
+  technicalId        String? @map("technical_id")
+  technicalReference String? @map("technical_reference")
+  updatedAt          String? @map("updated_at")
+
+  @@index([id])
+  @@index([softwareId])
+  @@index([technicalId])
+  @@index([ownerId])
+  @@map("system_roles")
+}
+
+model OrchestratorUser {
+  rowId            Int     @id @default(autoincrement()) @map("_row_id")
+  id               String?
+  admissionDate    String? @map("admission_date")
+  company          String?
+  contractType     String? @map("contract_type")
+  costCenter       String? @map("cost_center")
+  costCenterId     String? @map("cost_center_id")
+  createdAt        String? @map("created_at")
+  email            String?
+  functional       String?
+  functionalId     String? @map("functional_id")
+  hashString       String? @map("hash_string")
+  isCurrent        String? @map("is_current")
+  jobTitle         String? @map("job_title")
+  jobTitleId       String? @map("job_title_id")
+  manager          String?
+  managerId        String? @map("manager_id")
+  name             String?
+  organizational   String?
+  organizationalId String? @map("organizational_id")
+  seniority        String?
+  slackId          String? @map("slack_id")
+  status           String?
+  terminationDate  String? @map("termination_date")
+  updatedAt        String? @map("updated_at")
+  vp               String?
+
+  @@index([id])
+  @@index([email])
+  @@index([managerId])
+  @@index([organizationalId])
+  @@map("users")
+}
