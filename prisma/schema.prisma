@@ -395,6 +395,23 @@ model LogExportSettings {
   updatedAt             DateTime             @updatedAt
 }
 
+model UarSettings {
+  id                             String   @id @default(cuid())
+  tenantKey                      String   @default("default") @unique
+  systemReviewPeriodDays         Int      @default(365)
+  srReviewPeriodDays             Int      @default(180)
+  brReviewPeriodDays             Int      @default(180)
+  directAccessReviewPeriodDays   Int      @default(90)
+  reviewLookbackDays             Int      @default(30)
+  reviewWarningWindowDays        Int      @default(30)
+  overdueGraceDays               Int      @default(0)
+  notifyOwnersBeforeDays         Int      @default(15)
+  autoRevokeOnOverdue            Boolean  @default(true)
+  requireJustificationOnRenewal  Boolean  @default(true)
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
+}
+
 model OrchestratorAssignment {
   rowId            Int     @id @default(autoincrement()) @map("_row_id")
   id               String?

@@ -19,6 +19,12 @@ export default async function MyBrsPage() {
       id: true,
       name: true,
       technicalId: true,
+      associationCriteria: true,
+      company: true,
+      owner: true,
+      status: true,
+      lastRevisionDate: true,
+      nextRevisionDate: true,
     },
     distinct: ["id"],
   });
@@ -33,10 +39,26 @@ export default async function MyBrsPage() {
     },
     include: {
       permissions: {
-        select: { id: true },
+        include: {
+          permission: {
+            include: {
+              system: {
+                select: {
+                  criticality: true,
+                },
+              },
+            },
+          },
+        },
       },
       users: {
-        select: { id: true },
+        include: {
+          user: {
+            select: {
+              active: true,
+            },
+          },
+        },
       },
     },
     orderBy: { name: "asc" },
@@ -48,18 +70,36 @@ export default async function MyBrsPage() {
       {
         displayName: item.name,
         technicalId: item.technicalId,
+        associationCriteria: item.associationCriteria,
+        company: item.company,
+        owner: item.owner,
+        status: item.status,
+        lastRevisionDate: item.lastRevisionDate,
+        nextRevisionDate: item.nextRevisionDate,
       },
     ]),
   );
 
   const rows = brs.map((br) => {
     const alias = aliasById.get(br.id);
+    const activeUsers = br.users.filter((item) => item.user.active).length;
+    const inactiveUsers = br.users.length - activeUsers;
+    const criticalSrCount = br.permissions.filter((item) => item.permission.system.criticality === "HIGH").length;
     return {
       id: br.id,
       name: toFriendlyLabel(alias?.displayName || br.name, "Sem nome"),
       technicalId: toFriendlyLabel(alias?.technicalId, "-"),
       totalSrs: br.permissions.length,
       totalUsers: br.users.length,
+      activeUsers,
+      inactiveUsers,
+      criticalSrCount,
+      status: toFriendlyLabel(alias?.status, "-"),
+      company: toFriendlyLabel(alias?.company, "-"),
+      ownerName: toFriendlyLabel(alias?.owner, "-"),
+      associationCriteria: toFriendlyLabel(alias?.associationCriteria, "Sem criterio informado."),
+      lastRevisionDate: toFriendlyLabel(alias?.lastRevisionDate, "-"),
+      nextRevisionDate: toFriendlyLabel(alias?.nextRevisionDate, "-"),
     };
   });
 

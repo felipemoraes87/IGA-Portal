@@ -20,7 +20,17 @@ export default async function MyBrDetailPage({ params }: Readonly<{ params: Para
       ownerId: user.id,
       isCurrent: { equals: "true", mode: "insensitive" },
     },
-    select: { id: true, name: true, technicalId: true },
+    select: {
+      id: true,
+      name: true,
+      technicalId: true,
+      associationCriteria: true,
+      company: true,
+      owner: true,
+      status: true,
+      lastRevisionDate: true,
+      nextRevisionDate: true,
+    },
   });
   if (!ownership?.id) notFound();
 
@@ -147,6 +157,44 @@ export default async function MyBrDetailPage({ params }: Readonly<{ params: Para
       </section>
 
       <Card className="border-slate-200">
+        <h3 className="mb-3 text-lg font-bold text-slate-900">Governanca da BR</h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="text-slate-500">Criterio de associacao</p>
+              <p className="text-slate-800">{toFriendlyLabel(ownership.associationCriteria, "Sem criterio informado.")}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Empresa</p>
+              <p className="font-medium text-slate-900">{toFriendlyLabel(ownership.company, "-")}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Owner legado</p>
+              <p className="font-medium text-slate-900">{toFriendlyLabel(ownership.owner, "-")}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-slate-500">Status</p>
+              <p className="font-medium text-slate-900">{toFriendlyLabel(ownership.status, "-")}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-slate-500">Ultima revisao</p>
+              <p className="font-medium text-slate-900">{toFriendlyLabel(ownership.lastRevisionDate, "-")}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-slate-500">Proxima revisao</p>
+              <p className="font-medium text-slate-900">{toFriendlyLabel(ownership.nextRevisionDate, "-")}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-slate-500">Usuarios ativos</p>
+              <p className="font-medium text-slate-900">{br.users.filter((item) => item.user.active).length}</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="border-slate-200">
         <h3 className="mb-3 text-lg font-bold text-slate-900">SRs desta BR</h3>
         <MyBrSrSplitView rows={srRows} />
       </Card>
@@ -178,4 +226,3 @@ export default async function MyBrDetailPage({ params }: Readonly<{ params: Para
     </AppShell>
   );
 }
-

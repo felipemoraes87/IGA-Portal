@@ -94,7 +94,7 @@ export default async function AdminOperationPage() {
     >
       <Card className="mb-4 bg-[#fff8e8]">
         <p className="text-sm text-slate-700">
-          Esta area suporta operacoes manuais de administracao: atribuicao direta de SR em user, reconciliacao de BR e reconciliacao de SR.
+          Esta area suporta operacoes manuais de administracao: concessao e revogacao direta de SR em user, reconciliacao de BR e reconciliacao de SR.
           Todas as acoes sao auditadas.
         </p>
       </Card>

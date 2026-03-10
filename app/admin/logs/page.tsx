@@ -50,6 +50,15 @@ function renderDetails(details: unknown) {
   }
 }
 
+function buildLogsHref(filters: Record<string, string | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value?.trim()) search.set(key, value.trim());
+  }
+  search.set("page", "1");
+  return `/admin/logs?${search.toString()}`;
+}
+
 export default async function AdminLogsPage({ searchParams }: Readonly<{ searchParams: SearchParams }>) {
   const user = await requirePageUser("ADMIN");
   const params = await searchParams;
@@ -167,6 +176,30 @@ export default async function AdminLogsPage({ searchParams }: Readonly<{ searchP
       <LogExportClient initialSettings={toPublicLogExportSettings(logExportSettings)} />
 
       <Card>
+        <div className="mb-3 flex flex-wrap gap-2">
+          <a href={buildLogsHref({})} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+            Todos os eventos
+          </a>
+          <a
+            href={buildLogsHref({ action: "UAR_SETTINGS_UPDATED", entityType: "UarSettings" })}
+            className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
+          >
+            UAR Settings
+          </a>
+          <a
+            href={buildLogsHref({ action: "SCIM_SETTINGS_UPDATED", entityType: "ScimSettings" })}
+            className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100"
+          >
+            SCIM Settings
+          </a>
+          <a
+            href={buildLogsHref({ action: "LOG_EXPORT_SETTINGS_UPDATED", entityType: "LogExportSettings" })}
+            className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100"
+          >
+            Export Settings
+          </a>
+        </div>
+
         <form className="mb-4 grid gap-3 rounded-xl border border-[#f1e6c9] bg-[#fff8e8]/40 p-3 md:grid-cols-4" method="get">
           <input type="hidden" name="page" value="1" />
           <input type="hidden" name="pageSize" value={String(pageSize)} />

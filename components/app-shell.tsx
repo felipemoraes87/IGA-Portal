@@ -107,15 +107,15 @@ export async function AppShell({ user, title, description, children }: AppShellP
 
   if (user.role === "ADMIN") {
     links.push({ href: "/admin", label: "Dashboard Admin", icon: "admin", section: "management" });
+    links.push({ href: "/admin/requests", label: "Solicitacoes", icon: "requests", section: "management" });
+    links.push({ href: "/admin/operation", label: "Operacoes", icon: "approvals", section: "management" });
+    links.push({ href: "/admin/logs", label: "Logs", icon: "assignment", section: "management" });
+    links.push({ href: "/admin/uar", label: "UAR", icon: "access", section: "management" });
     links.push({ href: "/admin/users", label: "Usuarios", icon: "user-management", section: "management" });
     links.push({ href: "/admin/systems", label: "Sistemas", icon: "my-systems", section: "management" });
-    links.push({ href: "/admin/business-roles", label: "Business Roles", icon: "my-brs", section: "management" });
     links.push({ href: "/admin/system-roles", label: "System Roles", icon: "system-roles", section: "management" });
-    links.push({ href: "/admin/requests", label: "Solicitacoes", icon: "requests", section: "management" });
-    links.push({ href: "/admin/logs", label: "Logs", icon: "assignment", section: "management" });
+    links.push({ href: "/admin/business-roles", label: "Business Roles", icon: "my-brs", section: "management" });
     links.push({ href: "/admin/assignment", label: "Assignment", icon: "assignment", section: "management" });
-    links.push({ href: "/admin/operation", label: "Operacoes", icon: "approvals", section: "management" });
-    links.push({ href: "/admin/uar", label: "UAR", icon: "access", section: "management" });
     links.push({ href: "/admin/scim", label: "SCIM", icon: "access", section: "management" });
   }
 

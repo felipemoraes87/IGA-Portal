@@ -7,7 +7,8 @@ import { db } from "@/lib/db";
 
 const operationSchema = z.discriminatedUnion("action", [
   z.object({
-    action: z.literal("ADD_SR_TO_USER"),
+    action: z.literal("MANAGE_SR_FOR_USER"),
+    operation: z.enum(["GRANT", "REVOKE"]),
     userId: z.string().min(1),
     permissionId: z.string().min(1),
     note: z.string().max(500).optional(),
@@ -52,7 +53,7 @@ const operationSchema = z.discriminatedUnion("action", [
 ]);
 
 type OperationInput = z.infer<typeof operationSchema>;
-type AddSrInput = Extract<OperationInput, { action: "ADD_SR_TO_USER" }>;
+type ManageSrInput = Extract<OperationInput, { action: "MANAGE_SR_FOR_USER" }>;
 type ReconBrInput = Extract<OperationInput, { action: "RECON_BR" }>;
 type ReconSrInput = Extract<OperationInput, { action: "RECON_SR" }>;
 type CreateApprovalDelegationInput = Extract<OperationInput, { action: "CREATE_APPROVAL_DELEGATION" }>;
@@ -69,7 +70,7 @@ function parseNote(note?: string) {
   return note ?? null;
 }
 
-async function handleAddSrToUser(actorId: string, input: AddSrInput) {
+async function handleManageSrForUser(actorId: string, input: ManageSrInput) {
   const [user, permission, srCurrent] = await Promise.all([
     db.user.findUnique({ where: { id: input.userId }, select: { id: true, active: true } }),
     db.permission.findUnique({ where: { id: input.permissionId }, select: { id: true, systemId: true } }),
@@ -79,7 +80,10 @@ async function handleAddSrToUser(actorId: string, input: AddSrInput) {
     }),
   ]);
 
-  if (!user?.active) {
+  if (!user) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+  if (input.operation === "GRANT" && !user.active) {
     return NextResponse.json({ error: "User not found or inactive" }, { status: 404 });
   }
   if (!permission) {
@@ -103,12 +107,49 @@ async function handleAddSrToUser(actorId: string, input: AddSrInput) {
     select: { id: true },
   });
 
-  if (exists) {
-    return NextResponse.json({ data: { action: input.action, message: "Assignment already exists" } });
+  if (input.operation === "GRANT") {
+    if (exists) {
+      return NextResponse.json({ data: { action: input.action, message: "Assignment already exists" } });
+    }
+
+    const created = await db.userPermissionAssignment.create({
+      data: {
+        userId: input.userId,
+        permissionId: input.permissionId,
+        source: AssignmentSource.DIRECT,
+      },
+    });
+
+    const details = {
+      operation: input.operation,
+      userId: input.userId,
+      permissionId: input.permissionId,
+      source: "DIRECT",
+      note: parseNote(input.note),
+    };
+    await writeAuditLog({
+      actorId,
+      action: "ADMIN_OPERATION_GRANT_SR_TO_USER",
+      entityType: "UserPermissionAssignment",
+      entityId: created.id,
+      details,
+    });
+
+    return NextResponse.json({
+      data: {
+        action: input.action,
+        createdId: created.id,
+        summary: summarize(details),
+      },
+    });
   }
 
-  const created = await db.userPermissionAssignment.create({
-    data: {
+  if (!exists) {
+    return NextResponse.json({ data: { action: input.action, message: "No direct assignment found to revoke" } });
+  }
+
+  const deleted = await db.userPermissionAssignment.deleteMany({
+    where: {
       userId: input.userId,
       permissionId: input.permissionId,
       source: AssignmentSource.DIRECT,
@@ -116,23 +157,24 @@ async function handleAddSrToUser(actorId: string, input: AddSrInput) {
   });
 
   const details = {
+    operation: input.operation,
     userId: input.userId,
     permissionId: input.permissionId,
     source: "DIRECT",
+    deletedAssignments: deleted.count,
     note: parseNote(input.note),
   };
   await writeAuditLog({
     actorId,
-    action: "ADMIN_OPERATION_ADD_SR_TO_USER",
+    action: "ADMIN_OPERATION_REVOKE_SR_FROM_USER",
     entityType: "UserPermissionAssignment",
-    entityId: created.id,
+    entityId: `${input.userId}:${input.permissionId}`,
     details,
   });
 
   return NextResponse.json({
     data: {
       action: input.action,
-      createdId: created.id,
       summary: summarize(details),
     },
   });
@@ -433,8 +475,8 @@ export async function POST(request: Request) {
     }
 
     switch (parsed.data.action) {
-      case "ADD_SR_TO_USER":
-        return handleAddSrToUser(actor.id, parsed.data);
+      case "MANAGE_SR_FOR_USER":
+        return handleManageSrForUser(actor.id, parsed.data);
       case "RECON_BR":
         return handleReconBr(actor.id, parsed.data);
       case "RECON_SR":

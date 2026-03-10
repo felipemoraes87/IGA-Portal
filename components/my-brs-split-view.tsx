@@ -10,6 +10,15 @@ type BrRow = {
   technicalId: string;
   totalSrs: number;
   totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  criticalSrCount: number;
+  status: string;
+  company: string;
+  ownerName: string;
+  associationCriteria: string;
+  lastRevisionDate: string;
+  nextRevisionDate: string;
 };
 
 export function MyBrsSplitView({ rows }: Readonly<{ rows: BrRow[] }>) {
@@ -72,19 +81,51 @@ export function MyBrsSplitView({ rows }: Readonly<{ rows: BrRow[] }>) {
                 <p className="font-semibold text-slate-900">{toFriendlyLabel(selected.name, "Sem nome")}</p>
               </div>
               <div>
-                <p className="text-slate-500">Technical ID</p>
-                <p className="font-medium text-slate-900">{toFriendlyLabel(selected.technicalId, "-")}</p>
+                <p className="text-slate-500">Owner</p>
+                <p className="font-medium text-slate-900">{toFriendlyLabel(selected.ownerName, "-")}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-slate-500">Status</p>
+                  <p className="font-medium text-slate-900">{toFriendlyLabel(selected.status, "-")}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Empresa</p>
+                  <p className="font-medium text-slate-900">{toFriendlyLabel(selected.company, "-")}</p>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Contexto operacional</p>
+              <div className="space-y-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                  <p className="font-semibold text-slate-800">Usuarios ativos</p>
+                  <p className="text-slate-600">{selected.activeUsers}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                  <p className="font-semibold text-slate-800">Usuarios inativos</p>
+                  <p className="text-slate-600">{selected.inactiveUsers}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                  <p className="font-semibold text-slate-800">SRs criticas</p>
+                  <p className="text-slate-600">{selected.criticalSrCount}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                  <p className="font-semibold text-slate-800">Proxima revisao</p>
+                  <p className="text-slate-600">{toFriendlyLabel(selected.nextRevisionDate, "-")}</p>
+                </div>
               </div>
             </section>
 
             <section className="space-y-2">
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <p className="font-semibold text-slate-800">SRs vinculadas</p>
-                <p className="text-slate-600">{selected.totalSrs}</p>
+                <p className="font-semibold text-slate-800">Criterio de associacao</p>
+                <p className="text-slate-600">{toFriendlyLabel(selected.associationCriteria, "Sem criterio informado.")}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <p className="font-semibold text-slate-800">Usuarios vinculados</p>
-                <p className="text-slate-600">{selected.totalUsers}</p>
+                <p className="font-semibold text-slate-800">Ultima revisao</p>
+                <p className="text-slate-600">{toFriendlyLabel(selected.lastRevisionDate, "-")}</p>
               </div>
             </section>
 
@@ -102,4 +143,3 @@ export function MyBrsSplitView({ rows }: Readonly<{ rows: BrRow[] }>) {
     </div>
   );
 }
-

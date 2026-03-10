@@ -35,6 +35,7 @@ Portal de Identity Governance and Administration (IGA) para:
 - SCIM 2.0 inbound no portal (`/api/scim/v2/*`)
 - n8n para execucao de grant de acesso (HMAC)
 - exportacao de logs para SIEM/bucket (Splunk HEC e AWS S3)
+- configuracao operacional de campanha UAR com persistencia e auditoria
 
 ## 3) Componentes Chave
 
@@ -172,16 +173,45 @@ Arquivo: `app/api/admin/operation/route.ts`
 
 Acoes:
 
-- `ADD_SR_TO_USER`
+- `MANAGE_SR_FOR_USER` (`GRANT` ou `REVOKE`)
 - `RECON_BR`
 - `RECON_SR`
+- `CREATE_APPROVAL_DELEGATION`
 
 Objetivo:
 
 - reconciliar estado entre snapshots/orquestrador e modelos do portal
 - reduzir drift de papel/permissao
+- permitir concessao/revogacao manual auditada de SR `DIRECT`
 
-### 3.8 Topbar (Busca, Alertas e Configuracoes)
+### 3.8 UAR (Campaign Settings)
+
+Arquivos:
+
+- `app/admin/uar/page.tsx`
+- `components/uar-settings-client.tsx`
+- `app/api/admin/uar/settings/route.ts`
+- `lib/uar-settings.ts`
+
+Capacidades:
+
+- configuracao persistida por tenant (`UarSettings`)
+- parametros de revisao para:
+  - `Sistema`
+  - `SR`
+  - `BR`
+  - `acesso direto`
+- janelas operacionais:
+  - lookback de revisoes recentes
+  - warning window
+  - grace period de atraso
+  - antecedencia de notificacao a owners
+- flags de politica:
+  - auto revogacao de vencidos
+  - justificativa obrigatoria na renovacao
+- auditoria reforcada em `UAR_SETTINGS_UPDATED` com `before`, `after` e `changedFields`
+
+### 3.9 Topbar (Busca, Alertas e Configuracoes)
 
 Arquivo: `components/app-shell-client.tsx`
 
@@ -203,7 +233,7 @@ Preferencias MVP:
 - reduzir animacoes
 - persistencia em `localStorage`
 
-### 3.9 Admin Logs e Exportacao Externa
+### 3.10 Admin Logs e Exportacao Externa
 
 Arquivos:
 
@@ -218,6 +248,10 @@ Capacidades:
 
 - consulta de `AuditLog` com filtros operacionais
 - pagina com tabela paginada e detalhes JSON por evento
+- filtros rapidos para eventos de configuracao:
+  - `UAR Settings`
+  - `SCIM Settings`
+  - `Export Settings`
 - configuracao de destino de exportacao:
   - `SPLUNK_HEC`
   - `AWS_S3`
@@ -238,6 +272,7 @@ Entidades de dominio principal:
 - `AccessRequest`, `AccessApproval`, `AccessExecution`
 - `AuditLog`
 - `LogExportSettings`
+- `UarSettings`
 - `UserScimGroup`, `UserProvisioningEvent`, `ScimSettings`
 
 Estados importantes:
@@ -577,3 +612,38 @@ Ao alterar sync de orquestrador:
   - AWS S3 (NDJSON)
 - Credenciais da exportacao armazenadas criptografadas.
 - Estado da ultima exportacao persistido na configuracao.
+
+## 17) Atualizacoes Relevantes (2026-03-10)
+
+### 17.1 UAR com parametros persistidos
+
+- `Admin > UAR` passou a ter uma secao de configuracao operacional para IAM.
+- Novo modelo Prisma: `UarSettings`.
+- Parametros disponiveis:
+  - periodicidade de revisao de `Sistema`, `SR`, `BR` e `acesso direto`
+  - `reviewLookbackDays`
+  - `reviewWarningWindowDays`
+  - `overdueGraceDays`
+  - `notifyOwnersBeforeDays`
+  - `autoRevokeOnOverdue`
+  - `requireJustificationOnRenewal`
+- As metricas e tabelas operacionais de `UAR` agora usam esses parametros em tempo real.
+
+### 17.2 Auditoria reforcada de configuracao
+
+- Alteracoes de `UAR` passaram a registrar evento `UAR_SETTINGS_UPDATED` com:
+  - `before`
+  - `after`
+  - `changedFields`
+  - `changedAt`
+- `Admin > Logs` recebeu atalho rapido para filtrar eventos de `UAR Settings`.
+
+### 17.3 Operacoes IAM: Grant/Revoke de SR
+
+- O fluxo antes chamado de `ADD_SR_TO_USER` foi substituido por `MANAGE_SR_FOR_USER`.
+- A operacao agora aceita:
+  - `GRANT`
+  - `REVOKE`
+- Eventos de auditoria separados:
+  - `ADMIN_OPERATION_GRANT_SR_TO_USER`
+  - `ADMIN_OPERATION_REVOKE_SR_FROM_USER`

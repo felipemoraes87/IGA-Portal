@@ -127,6 +127,7 @@ Observacao: autenticacao da UI e via SSO; esses usuarios seed servem como base d
 - `/admin` (dashboard admin)
 - `/admin/systems` (entrada de Administracao)
 - `/admin/operation`
+- `/admin/uar`
 - `/admin/scim`
 - `/admin/users`
 - `/admin/system-roles`
@@ -173,6 +174,8 @@ Admin:
 - `GET/POST /api/admin/business-roles`
 - `GET/POST /api/admin/users`
 - `POST /api/admin/operation` (ADD_SR_TO_USER, RECON_BR, RECON_SR)
+- `GET /api/admin/uar/settings`
+- `PUT /api/admin/uar/settings`
 - `GET/POST /api/users/:id/additional-accesses`
 - `GET/PUT /api/admin/scim/settings`
 - `POST /api/admin/scim/test`
@@ -383,6 +386,42 @@ Recursos implementados:
     - execucao manual por janela de tempo (`from/to`)
     - status da ultima exportacao (data, resultado, mensagem)
     - auditoria de configuracao e execucao de exportacao
+
+## Atualizacoes (2026-03-10)
+
+- **UAR (configuracao operacional IAM)**:
+  - `Admin > UAR` agora possui secao de parametros persistidos da campanha de revisao.
+  - Parametros disponiveis:
+    - periodo de revisao de `Sistema`
+    - periodo de revisao de `SR`
+    - periodo de revisao de `BR`
+    - periodo de revisao de `acesso direto`
+    - janela de itens revisados recentemente
+    - janela de aviso/prioridade
+    - tolerancia de atraso
+    - antecedencia de notificacao a owners
+    - flag de revogacao automatica
+    - flag de justificativa obrigatoria na renovacao
+  - As metricas e listas de BR/acessos diretos em `UAR` passaram a usar esses parametros.
+  - Auditoria reforcada para `UAR_SETTINGS_UPDATED` com:
+    - estado anterior
+    - estado novo
+    - campos alterados
+
+- **Logs administrativos**:
+  - `Admin > Logs` recebeu filtros rapidos no topo para:
+    - `UAR Settings`
+    - `SCIM Settings`
+    - `Export Settings`
+
+- **Operacoes IAM**:
+  - O bloco manual de SR em usuario foi convertido para operacao generica de gestao de SR.
+  - Campo `Acao` adicionado com:
+    - `Grant`
+    - `Revoke`
+  - Auditoria separada por tipo de acao:
+    - `ADMIN_OPERATION_GRANT_SR_TO_USER`
+    - `ADMIN_OPERATION_REVOKE_SR_FROM_USER`
 
 ## Troubleshooting
 

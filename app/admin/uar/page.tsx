@@ -1,7 +1,9 @@
 import { AppShell } from "@/components/app-shell";
+import { UarSettingsClient } from "@/components/uar-settings-client";
 import { Card } from "@/components/ui/card";
 import { requirePageUser } from "@/lib/page-auth";
 import { db } from "@/lib/db";
+import { ensureUarSettings, toPublicUarSettings } from "@/lib/uar-settings";
 import { toFriendlyLabel } from "@/lib/utils";
 
 type SummaryRow = {
@@ -59,6 +61,14 @@ function MetricCard({ title, value, hint }: Readonly<{ title: string; value: str
 
 export default async function AdminUarPage() {
   const user = await requirePageUser("ADMIN");
+  const settings = await ensureUarSettings();
+  const today = new Date();
+  const lookbackStart = new Date(today);
+  lookbackStart.setDate(today.getDate() - settings.reviewLookbackDays);
+  const warningEnd = new Date(today);
+  warningEnd.setDate(today.getDate() + settings.reviewWarningWindowDays);
+  const overdueThreshold = new Date(today);
+  overdueThreshold.setDate(today.getDate() - settings.overdueGraceDays);
 
   const [
     brSummaryRes,
@@ -82,10 +92,10 @@ export default async function AdminUarPage() {
         ORDER BY id, updated_at DESC NULLS LAST, _row_id DESC
       )
       SELECT
-        COUNT(*) FILTER (WHERE last_revision_dt >= current_date - interval '30 days') AS reviewed_recently,
-        COUNT(*) FILTER (WHERE next_revision_dt BETWEEN current_date AND current_date + interval '30 days') AS pending,
-        COUNT(*) FILTER (WHERE next_revision_dt < current_date) AS overdue,
-        COUNT(*) FILTER (WHERE next_revision_dt > current_date + interval '30 days') AS upcoming,
+        COUNT(*) FILTER (WHERE last_revision_dt >= ${lookbackStart}) AS reviewed_recently,
+        COUNT(*) FILTER (WHERE next_revision_dt BETWEEN ${today} AND ${warningEnd}) AS pending,
+        COUNT(*) FILTER (WHERE next_revision_dt < ${overdueThreshold}) AS overdue,
+        COUNT(*) FILTER (WHERE next_revision_dt > ${warningEnd}) AS upcoming,
         COUNT(*) AS total_current
       FROM br_latest
     `,
@@ -110,7 +120,7 @@ export default async function AdminUarPage() {
         to_char(last_revision_dt, 'YYYY-MM-DD') AS last_revision_dt,
         to_char(next_revision_dt, 'YYYY-MM-DD') AS next_revision_dt
       FROM br_latest
-      WHERE next_revision_dt < current_date
+      WHERE next_revision_dt < ${overdueThreshold}
       ORDER BY next_revision_dt ASC NULLS FIRST, br_name ASC
       LIMIT 12
     `,
@@ -135,7 +145,7 @@ export default async function AdminUarPage() {
         to_char(last_revision_dt, 'YYYY-MM-DD') AS last_revision_dt,
         to_char(next_revision_dt, 'YYYY-MM-DD') AS next_revision_dt
       FROM br_latest
-      WHERE next_revision_dt >= current_date
+      WHERE next_revision_dt BETWEEN ${today} AND ${warningEnd}
       ORDER BY next_revision_dt ASC NULLS LAST, br_name ASC
       LIMIT 12
     `,
@@ -152,8 +162,8 @@ export default async function AdminUarPage() {
       SELECT
         responsible,
         COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE next_revision_dt BETWEEN current_date AND current_date + interval '30 days') AS pending,
-        COUNT(*) FILTER (WHERE next_revision_dt < current_date) AS overdue
+        COUNT(*) FILTER (WHERE next_revision_dt BETWEEN ${today} AND ${warningEnd}) AS pending,
+        COUNT(*) FILTER (WHERE next_revision_dt < ${overdueThreshold}) AS overdue
       FROM br_latest
       GROUP BY responsible
       ORDER BY overdue DESC, pending DESC, total DESC
@@ -189,10 +199,10 @@ export default async function AdminUarPage() {
         ORDER BY access_key, created_ts DESC NULLS LAST, _row_id DESC
       )
       SELECT
-        COUNT(*) FILTER (WHERE grant_dt >= current_date - interval '30 days') AS reviewed_recently,
-        COUNT(*) FILTER (WHERE expiration_dt BETWEEN current_date AND current_date + interval '30 days') AS pending,
-        COUNT(*) FILTER (WHERE expiration_dt < current_date) AS overdue,
-        COUNT(*) FILTER (WHERE expiration_dt > current_date + interval '30 days') AS upcoming,
+        COUNT(*) FILTER (WHERE grant_dt >= ${lookbackStart}) AS reviewed_recently,
+        COUNT(*) FILTER (WHERE expiration_dt BETWEEN ${today} AND ${warningEnd}) AS pending,
+        COUNT(*) FILTER (WHERE expiration_dt < ${overdueThreshold}) AS overdue,
+        COUNT(*) FILTER (WHERE expiration_dt > ${warningEnd}) AS upcoming,
         COUNT(*) AS total_current
       FROM direct_latest
     `,
@@ -233,7 +243,7 @@ export default async function AdminUarPage() {
         to_char(grant_dt, 'YYYY-MM-DD') AS grant_dt,
         to_char(expiration_dt, 'YYYY-MM-DD') AS expiration_dt
       FROM direct_latest
-      WHERE expiration_dt < current_date
+      WHERE expiration_dt < ${overdueThreshold}
       ORDER BY expiration_dt ASC NULLS FIRST, user_name ASC
       LIMIT 12
     `,
@@ -274,7 +284,7 @@ export default async function AdminUarPage() {
         to_char(grant_dt, 'YYYY-MM-DD') AS grant_dt,
         to_char(expiration_dt, 'YYYY-MM-DD') AS expiration_dt
       FROM direct_latest
-      WHERE expiration_dt >= current_date
+      WHERE expiration_dt BETWEEN ${today} AND ${warningEnd}
       ORDER BY expiration_dt ASC NULLS LAST, user_name ASC
       LIMIT 12
     `,
@@ -302,8 +312,8 @@ export default async function AdminUarPage() {
       SELECT
         responsible,
         COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE expiration_dt BETWEEN current_date AND current_date + interval '30 days') AS pending,
-        COUNT(*) FILTER (WHERE expiration_dt < current_date) AS overdue
+        COUNT(*) FILTER (WHERE expiration_dt BETWEEN ${today} AND ${warningEnd}) AS pending,
+        COUNT(*) FILTER (WHERE expiration_dt < ${overdueThreshold}) AS overdue
       FROM direct_latest
       GROUP BY responsible
       ORDER BY overdue DESC, pending DESC, total DESC
@@ -320,6 +330,7 @@ export default async function AdminUarPage() {
       title="Admin - UAR"
       description="Campanha de revisao de acessos (UAR) para BRs e acessos diretos."
     >
+      <UarSettingsClient initialSettings={toPublicUarSettings(settings)} />
 
       <Card className="mb-3 bg-amber-50 p-3">
         <p className="text-xs text-slate-700">
@@ -328,15 +339,22 @@ export default async function AdminUarPage() {
         </p>
       </Card>
 
+      <div className="mb-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Politica Sistema" value={`${settings.systemReviewPeriodDays}d`} hint="Periodicidade de revisao de sistema" />
+        <MetricCard title="Politica SR" value={`${settings.srReviewPeriodDays}d`} hint="Periodicidade de revisao de SR" />
+        <MetricCard title="Politica BR" value={`${settings.brReviewPeriodDays}d`} hint="Periodicidade de revisao de BR" />
+        <MetricCard title="Acesso Direto" value={`${settings.directAccessReviewPeriodDays}d`} hint="Periodicidade de revisao DIRECT" />
+      </div>
+
       <section className="space-y-3">
         <Card className="p-4">
           <h3 className="text-base font-semibold text-slate-900">Revisao de BRs</h3>
           <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
             <MetricCard title="Total BRs" value={String(toNumber(brSummary?.total_current))} hint="BRs atuais na base" />
-            <MetricCard title="Revisadas (30d)" value={String(toNumber(brSummary?.reviewed_recently))} hint="Ultimos 30 dias" />
-            <MetricCard title="Pendentes (30d)" value={String(toNumber(brSummary?.pending))} hint="Vencem nos proximos 30 dias" />
-            <MetricCard title="Atrasadas" value={String(toNumber(brSummary?.overdue))} hint="Data de revisao vencida" />
-            <MetricCard title="Proximas" value={String(toNumber(brSummary?.upcoming))} hint="Revisao apos 30 dias" />
+            <MetricCard title={`Revisadas (${settings.reviewLookbackDays}d)`} value={String(toNumber(brSummary?.reviewed_recently))} hint={`Ultimos ${settings.reviewLookbackDays} dias`} />
+            <MetricCard title={`Pendentes (${settings.reviewWarningWindowDays}d)`} value={String(toNumber(brSummary?.pending))} hint={`Vencem nos proximos ${settings.reviewWarningWindowDays} dias`} />
+            <MetricCard title="Atrasadas" value={String(toNumber(brSummary?.overdue))} hint={settings.overdueGraceDays > 0 ? `Alem da tolerancia de ${settings.overdueGraceDays} dia(s)` : "Data de revisao vencida"} />
+            <MetricCard title="Fora da janela" value={String(toNumber(brSummary?.upcoming))} hint={`Revisao apos ${settings.reviewWarningWindowDays} dias`} />
           </div>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <div>
@@ -429,10 +447,10 @@ export default async function AdminUarPage() {
           <h3 className="text-base font-semibold text-slate-900">Revisao de Acessos Diretos</h3>
           <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
             <MetricCard title="Total Acessos" value={String(toNumber(directSummary?.total_current))} hint="Acessos DIRECT ativos" />
-            <MetricCard title="Renovados (30d)" value={String(toNumber(directSummary?.reviewed_recently))} hint="Concedidos/revisados recentes" />
-            <MetricCard title="Pendentes (30d)" value={String(toNumber(directSummary?.pending))} hint="Expiram nos proximos 30 dias" />
-            <MetricCard title="Atrasados" value={String(toNumber(directSummary?.overdue))} hint="Expirados e ainda ativos" />
-            <MetricCard title="Proximos" value={String(toNumber(directSummary?.upcoming))} hint="Com revisao mais a frente" />
+            <MetricCard title={`Renovados (${settings.reviewLookbackDays}d)`} value={String(toNumber(directSummary?.reviewed_recently))} hint="Concedidos ou revisados recentes" />
+            <MetricCard title={`Pendentes (${settings.reviewWarningWindowDays}d)`} value={String(toNumber(directSummary?.pending))} hint={`Expiram nos proximos ${settings.reviewWarningWindowDays} dias`} />
+            <MetricCard title="Atrasados" value={String(toNumber(directSummary?.overdue))} hint={settings.overdueGraceDays > 0 ? `Expirados alem de ${settings.overdueGraceDays} dia(s)` : "Expirados e ainda ativos"} />
+            <MetricCard title="Fora da janela" value={String(toNumber(directSummary?.upcoming))} hint="Com revisao mais a frente" />
           </div>
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2">

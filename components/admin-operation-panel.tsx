@@ -41,6 +41,7 @@ export function AdminOperationPanel({ users, businessRoles, permissions }: Props
 
   const [manualUserId, setManualUserId] = useState(users[0]?.id ?? "");
   const [manualPermissionId, setManualPermissionId] = useState(permissions[0]?.id ?? "");
+  const [manualOperation, setManualOperation] = useState<"GRANT" | "REVOKE">("GRANT");
   const [manualNote, setManualNote] = useState("");
 
   const [reconBrId, setReconBrId] = useState(businessRoles[0]?.id ?? "");
@@ -110,23 +111,30 @@ export function AdminOperationPanel({ users, businessRoles, permissions }: Props
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card>
-        <h3 className="text-lg font-bold text-slate-900">Adicionar SR em user</h3>
-        <p className="mt-1 text-sm text-slate-500">Cria atribuicao manual DIRECT para testes ou ajustes operacionais.</p>
+        <h3 className="text-lg font-bold text-slate-900">Gerenciar SR em user</h3>
+        <p className="mt-1 text-sm text-slate-500">Executa atribuicao ou revogacao manual de SR DIRECT para testes e ajustes operacionais.</p>
         <form
           className="mt-4 space-y-3"
           onSubmit={(event) => {
             event.preventDefault();
             runOperation(
               {
-                action: "ADD_SR_TO_USER",
+                action: "MANAGE_SR_FOR_USER",
+                operation: manualOperation,
                 userId: manualUserId,
                 permissionId: manualPermissionId,
                 note: manualNote,
               },
-              "ADD_SR_TO_USER",
+              "MANAGE_SR_FOR_USER",
             );
           }}
         >
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Acao</label>
+          <select value={manualOperation} onChange={(event) => setManualOperation(event.target.value as "GRANT" | "REVOKE")} className="w-full rounded-xl border border-[#e7d7ac] bg-white px-3 py-2 text-sm">
+            <option value="GRANT">Grant</option>
+            <option value="REVOKE">Revoke</option>
+          </select>
+
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">User</label>
           <select value={manualUserId} onChange={(event) => setManualUserId(event.target.value)} className="w-full rounded-xl border border-[#e7d7ac] bg-white px-3 py-2 text-sm">
             {users.map((item) => (
@@ -155,10 +163,10 @@ export function AdminOperationPanel({ users, businessRoles, permissions }: Props
 
           <button
             type="submit"
-            disabled={loadingAction === "ADD_SR_TO_USER" || !manualUserId || !manualPermissionId}
+            disabled={loadingAction === "MANAGE_SR_FOR_USER" || !manualUserId || !manualPermissionId}
             className="rounded-xl bg-[#800020] px-4 py-2 text-sm font-semibold text-white hover:bg-[#68001a] disabled:opacity-60"
           >
-            {loadingAction === "ADD_SR_TO_USER" ? "Executando..." : "Adicionar"}
+            {loadingAction === "MANAGE_SR_FOR_USER" ? "Executando..." : manualOperation === "GRANT" ? "Conceder SR" : "Revogar SR"}
           </button>
         </form>
       </Card>
