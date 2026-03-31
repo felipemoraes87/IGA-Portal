@@ -1,0 +1,95 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: iga_portal_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-iga_portal}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: iga_portal_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@localhost}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set PGADMIN_DEFAULT_PASSWORD in .env}
+      PGPASSFILE: /var/lib/pgadmin/.pgpass
+    ports:
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - cp /pgpass /var/lib/pgadmin/.pgpass && chmod 600 /var/lib/pgadmin/.pgpass && /entrypoint.sh
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/.pgpass:/pgpass:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: iga_portal_keycloak
+    restart: always
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
+    ports:
+      - "${KEYCLOAK_BIND:-127.0.0.1}:${KEYCLOAK_PORT:-8080}:8080"
+    volumes:
+      - ./keycloak/realm-iga.json:/opt/keycloak/data/import/realm-iga.json:ro
+      - keycloak_data:/opt/keycloak/data
+
+  sonarqube_db:
+    image: postgres:15-alpine
+    container_name: iga_portal_sonarqube_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${SONAR_DB_USER:-sonar}
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:?Set SONAR_DB_PASSWORD in .env}
+      POSTGRES_DB: ${SONAR_DB_NAME:-sonarqube}
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: iga_portal_sonarqube
+    restart: always
+    ports:
+      - "127.0.0.1:${SONAR_PORT:-9000}:9000"
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube_db:5432/${SONAR_DB_NAME:-sonarqube}
+      SONAR_JDBC_USERNAME: ${SONAR_DB_USER:-sonar}
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:?Set SONAR_DB_PASSWORD in .env}
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    depends_on:
+      sonarqube_db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  keycloak_data:
+  sonarqube_db_data:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:

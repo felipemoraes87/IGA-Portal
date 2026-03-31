@@ -37,6 +37,26 @@ Portal de Identity Governance and Administration (IGA) para:
 - exportacao de logs para SIEM/bucket (Splunk HEC e AWS S3)
 - configuracao operacional de campanha UAR com persistencia e auditoria
 
+### 2.4 Infra local
+
+Historicamente o workspace usou um compose compartilhado em `C:\Users\felipe\Python\docker-compose.yml`.
+
+Para melhorar portabilidade e onboarding do repositorio, agora tambem existe uma stack local em:
+
+- `infra/docker-compose.yml`
+- `infra/.env.example`
+- `infra/keycloak/realm-iga.json`
+- `infra/pgadmin/servers.json`
+- `infra/pgadmin/.pgpass`
+
+Servicos incluidos nessa stack:
+
+- `db`
+- `pgadmin`
+- `keycloak`
+- `sonarqube_db`
+- `sonarqube`
+
 ## 3) Componentes Chave
 
 ### 3.1 Autenticacao
