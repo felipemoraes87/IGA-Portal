@@ -1,0 +1,32 @@
+{
+  "id": "iga",
+  "realm": "iga",
+  "enabled": true,
+  "displayName": "IGA Realm",
+  "clients": [
+    {
+      "clientId": "iga-portal",
+      "name": "IGA Portal",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "secret": "CHANGE_ME_CLIENT_SECRET",
+      "fullScopeAllowed": true
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "sr-security-cybersec-iam"
+      }
+    ]
+  }
+}

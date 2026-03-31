@@ -5,7 +5,9 @@ Portal de governanca de acessos com SSO Keycloak, fluxo de solicitacao/aprovacao
 ## Leitura Recomendada
 
 1. `PROJECT_CONTEXT.md` (contexto tecnico detalhado para novas sessoes de coding)
-2. Este `README.md` (setup, operacao e troubleshooting)
+2. `infra/README.md` (infra local autocontida do projeto)
+3. `SESSION_KEY_POINTS.md` (decisoes recentes do workspace)
+4. Este `README.md` (setup, operacao e troubleshooting)
 
 ## Stack
 
@@ -30,21 +32,47 @@ Portal de governanca de acessos com SSO Keycloak, fluxo de solicitacao/aprovacao
 - Node.js 20+
 - npm 10+
 - Docker Desktop
-- Infra do `docker-compose.yml` em `C:\Users\felipe\Python`
+- Infra local em `iga-portal/infra/docker-compose.yml` ou infra compartilhada em `C:\Users\felipe\Python\docker-compose.yml`
 
-## Infra (Postgres/Keycloak)
+## Infra
 
-A partir de `C:\Users\felipe\Python`:
+Hoje existem dois caminhos validos:
+
+### Opcao recomendada: infra dentro do projeto
+
+A partir de `C:\Users\felipe\Python\iga-portal\infra`:
 
 ```powershell
+Copy-Item .env.example .env
 docker compose up -d
 ```
 
-Servicos usados:
+Servicos desta stack:
 
 - Postgres: `localhost:5432` (`iga_portal`)
 - Keycloak: `http://localhost:8080`
 - (Opcional) pgAdmin: `http://localhost:5050`
+- (Opcional) SonarQube: `http://localhost:9000`
+
+Arquivos principais:
+
+- `infra/docker-compose.yml`
+- `infra/.env.example`
+- `infra/keycloak/realm-iga.json`
+- `infra/pgadmin/servers.json`
+- `infra/pgadmin/.pgpass`
+
+### Opcao legada: infra compartilhada do workspace
+
+O workspace ainda possui um compose compartilhado em [docker-compose.yml](c:/Users/felipe/Python/docker-compose.yml).
+
+Essa opcao faz sentido quando a mesma infra local precisa ser reaproveitada por mais de um projeto. O compose compartilhado sobe:
+
+- `db`
+- `pgadmin`
+- `keycloak`
+- `sonarqube_db`
+- `sonarqube`
 
 ## Configuracao de Ambiente
 
@@ -471,3 +499,4 @@ npm run test:coverage
 Para continuidade de desenvolvimento em novas sessoes, leia:
 
 - `PROJECT_CONTEXT.md`
+- `SESSION_KEY_POINTS.md`
